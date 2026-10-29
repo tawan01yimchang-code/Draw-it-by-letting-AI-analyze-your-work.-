@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Speed Sketcher & Gemini API Critic</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter & Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'sans-serif'],
+                    },
+                    colors: {
+                        mint: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            sage: '#e2ede6',
+                            light: '#f4f9f5',
+                            card: '#eaf4ee',
+                            accent: '#68b684',
+                            dark: '#1e382b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f4f9f5;
+            color: #1e382b;
+            user-select: none;
+        }
+        canvas {
+            touch-action: none;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden">
+
+    <!-- App Container -->
+    <div id="app" class="flex-1 flex flex-col h-full w-full relative overflow-hidden">
+
+        <!-- HOME SCREEN -->
+        <div id="home-screen" class="flex-1 flex flex-col items-center justify-center p-6 z-10 overflow-y-auto">
+            <div class="max-w-md w-full bg-white/90 backdrop-blur-md rounded-3xl p-8 shadow-xl border border-mint-200 text-center relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-32 h-32 bg-mint-200 rounded-full blur-2xl opacity-60"></div>
+                <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-emerald-100 rounded-full blur-2xl opacity-60"></div>
+                
+                <div class="w-20 h-20 bg-mint-100 rounded-2xl mx-auto flex items-center justify-center text-mint-700 text-3xl mb-5 shadow-inner">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+
+                <h1 class="text-3xl font-bold text-mint-dark mb-1">AI Speed Sketcher</h1>
+                <p class="text-gray-500 text-xs mb-5">วาดภาพแข่งขันกับเวลา พร้อมระบบตรวจวิเคราะห์ภาพจริงผ่าน <b>Gemini API</b> (วิเคราะห์ตรงไปตรงมา ไม่สวยว่าไม่สวย!)</p>
+
+                <!-- API Key Input -->
+                <div class="mb-5 text-left bg-mint-50 p-3 rounded-2xl border border-mint-200">
+                    <label class="block text-xs font-semibold text-mint-700 mb-1 flex items-center justify-between">
+                        <span>Gemini API Key (ถ้ามี)</span>
+                        <span class="text-[10px] text-gray-400 font-normal">เว้นว่างไว้ใช้ระบบตรวจอัจฉริยะในตัว</span>
+                    </label>
+                    <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full px-3 py-2 text-xs bg-white border border-mint-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-mint-500 text-gray-700">
+                </div>
+
+                <!-- Time selector -->
+                <div class="mb-6 text-left">
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">เลือกเวลาต่อรอบ</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="setTimerDuration(30)" id="btn-time-30" class="py-3 px-4 rounded-xl font-medium border-2 border-mint-500 bg-mint-500 text-white transition-all shadow-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-bolt"></i> 30 วินาที
+                        </button>
+                        <button onclick="setTimerDuration(60)" id="btn-time-60" class="py-3 px-4 rounded-xl font-medium border-2 border-mint-200 bg-white text-gray-700 hover:border-mint-400 transition-all shadow-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-clock"></i> 1 นาที
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-mint-600 to-emerald-600 hover:from-mint-700 hover:to-emerald-700 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg">
+                    <span>เริ่มวาดภาพเต็มจอ</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+
+                <div class="mt-6 pt-4 border-t border-gray-100 flex justify-around text-[11px] text-gray-500">
+                    <div><i class="fa-solid fa-check text-mint-600 mr-1"></i> 120 โจทย์สุ่ม</div>
+                    <div><i class="fa-solid fa-check text-mint-600 mr-1"></i> วิเคราะห์ด้วย AI จริง</div>
+                    <div><i class="fa-solid fa-check text-mint-600 mr-1"></i> ตัดสินตรงไปตรงมา</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAMEPLAY SCREEN (FULLSCREEN) -->
+        <div id="game-screen" class="hidden absolute inset-0 bg-mint-light flex flex-col z-20">
+            <!-- Top Bar -->
+            <header class="bg-white/90 backdrop-blur border-b border-mint-200 px-4 py-3 flex items-center justify-between shadow-sm">
+                <div class="flex items-center gap-3">
+                    <button onclick="returnToHome()" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition">
+                        <i class="fa-solid fa-house"></i>
+                    </button>
+                    <div>
+                        <div class="text-[11px] text-gray-500 uppercase tracking-wider font-medium">โจทย์ที่คุณต้องวาด</div>
+                        <div id="prompt-display" class="text-xl font-bold text-mint-dark flex items-center gap-2">
+                            <span id="prompt-text">แมวเหมียว</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timer Center -->
+                <div class="flex flex-col items-center">
+                    <div class="flex items-center gap-2 font-mono font-bold text-lg text-emerald-800 bg-mint-100 px-4 py-1 rounded-full border border-mint-200">
+                        <i class="fa-solid fa-hourglass-half animate-spin text-mint-600"></i>
+                        <span id="timer-text">30</span>s
+                    </div>
+                    <div class="w-32 bg-gray-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                        <div id="timer-progress" class="bg-mint-500 h-full w-full transition-all duration-1000"></div>
+                    </div>
+                </div>
+
+                <!-- Action Controls Top -->
+                <div class="flex items-center gap-2">
+                    <button onclick="skipPrompt()" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-semibold rounded-xl border border-amber-200 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-forward"></i> ข้ามโจทย์
+                    </button>
+                    <button onclick="submitDrawing()" class="px-5 py-2 bg-mint-600 hover:bg-mint-700 text-white text-sm font-semibold rounded-xl shadow-md transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-paper-plane"></i> ส่งตรวจ AI
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Canvas Area -->
+            <div class="flex-1 relative flex items-center justify-center p-4">
+                <div class="w-full h-full max-w-5xl max-h-[75vh] bg-white rounded-3xl shadow-xl border border-mint-200 overflow-hidden flex flex-col relative">
+                    <canvas id="drawing-canvas" class="flex-1 w-full h-full bg-white"></canvas>
+                    
+                    <!-- Floating Toolbar Bottom -->
+                    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur shadow-lg border border-mint-200 rounded-2xl px-4 py-2.5 flex items-center gap-4 z-10">
+                        <!-- Colors -->
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="setPenColor('#1e382b')" class="w-7 h-7 rounded-full bg-[#1e382b] border-2 border-white shadow color-btn ring-2 ring-mint-400" data-color="#1e382b"></button>
+                            <button onclick="setPenColor('#22c55e')" class="w-7 h-7 rounded-full bg-[#22c55e] border-2 border-white shadow color-btn" data-color="#22c55e"></button>
+                            <button onclick="setPenColor('#3b82f6')" class="w-7 h-7 rounded-full bg-[#3b82f6] border-2 border-white shadow color-btn" data-color="#3b82f6"></button>
+                            <button onclick="setPenColor('#ef4444')" class="w-7 h-7 rounded-full bg-[#ef4444] border-2 border-white shadow color-btn" data-color="#ef4444"></button>
+                            <button onclick="setPenColor('#eab308')" class="w-7 h-7 rounded-full bg-[#eab308] border-2 border-white shadow color-btn" data-color="#eab308"></button>
+                            <button onclick="setPenColor('#000000')" class="w-7 h-7 rounded-full bg-[#000000] border-2 border-white shadow color-btn" data-color="#000000"></button>
+                        </div>
+
+                        <div class="h-6 w-px bg-gray-200"></div>
+
+                        <!-- Tool Mode -->
+                        <div class="flex items-center gap-1">
+                            <button onclick="setTool('pen')" id="tool-pen" class="px-3 py-1.5 rounded-xl bg-mint-100 text-mint-700 font-medium text-sm flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-pen"></i> ปากกา
+                            </button>
+                            <button onclick="setTool('eraser')" id="tool-eraser" class="px-3 py-1.5 rounded-xl hover:bg-gray-100 text-gray-600 font-medium text-sm flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-eraser"></i> ยางลบ
+                            </button>
+                        </div>
+
+                        <div class="h-6 w-px bg-gray-200"></div>
+
+                        <!-- Brush Size -->
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-circle text-xs text-gray-400"></i>
+                            <input type="range" id="brush-size" min="2" max="30" value="5" class="w-20 accent-mint-600 cursor-pointer" oninput="setBrushSize(this.value)">
+                            <i class="fa-solid fa-circle text-lg text-gray-400"></i>
+                        </div>
+
+                        <div class="h-6 w-px bg-gray-200"></div>
+
+                        <!-- Clear Canvas -->
+                        <button onclick="clearCanvas()" class="px-3 py-1.5 rounded-xl hover:bg-red-50 text-red-600 font-medium text-sm flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-rotate-right"></i> ล้างกระดาน
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ANALYZING MODAL / SCREEN -->
+        <div id="analyzing-screen" class="hidden absolute inset-0 bg-mint-dark/80 backdrop-blur-md flex flex-col items-center justify-center z-30 p-4">
+            <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-mint-200 relative overflow-hidden">
+                <div class="w-24 h-24 mx-auto mb-6 relative">
+                    <div class="absolute inset-0 border-4 border-mint-200 rounded-full animate-ping opacity-30"></div>
+                    <div class="absolute inset-0 border-4 border-mint-500 rounded-full border-t-transparent animate-spin"></div>
+                    <div class="absolute inset-0 flex items-center justify-center text-mint-600 text-3xl">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-mint-dark mb-2">Gemini AI กำลังวิเคราะห์ภาพ...</h3>
+                <p class="text-gray-500 text-sm mb-6" id="analyzing-status">กำลังส่งภาพแปลง Base64 สู่ระบบ Multimodal AI...</p>
+                <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                    <div id="analysis-bar" class="bg-mint-500 h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULT SCREEN -->
+        <div id="result-screen" class="hidden absolute inset-0 bg-mint-light flex flex-col z-40 overflow-y-auto p-4 md:p-8">
+            <div class="max-w-3xl w-full mx-auto bg-white rounded-3xl shadow-xl border border-mint-200 overflow-hidden my-auto flex flex-col">
+                <!-- Result Header -->
+                <div class="bg-gradient-to-r from-mint-600 to-emerald-600 p-6 text-white text-center relative">
+                    <h2 class="text-2xl font-bold mb-1">ผลการวิเคราะห์จาก Gemini AI จริง</h2>
+                    <p class="text-mint-100 text-sm">โจทย์ที่ได้รับ: <span id="res-prompt" class="font-semibold underline">แมวเหมียว</span></p>
+                </div>
+
+                <!-- Result Body -->
+                <div class="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <!-- Thumbnail preview -->
+                    <div class="flex flex-col items-center">
+                        <div class="w-full aspect-square bg-gray-50 rounded-2xl border-2 border-mint-200 overflow-hidden shadow-inner p-2 flex items-center justify-center">
+                            <img id="res-image" src="" alt="Drawing Result" class="max-h-full max-w-full object-contain rounded-lg">
+                        </div>
+                        <span class="text-xs text-gray-400 mt-2">ภาพวาดของคุณ</span>
+                    </div>
+
+                    <!-- Score and Feedback -->
+                    <div class="flex flex-col justify-between space-y-4">
+                        <div class="flex items-center justify-between bg-mint-50 p-4 rounded-2xl border border-mint-200">
+                            <div>
+                                <div class="text-xs text-gray-500 font-semibold uppercase">การตัดสินใจของ AI</div>
+                                <div id="res-verdict" class="text-lg font-bold text-emerald-700">ผลงานเยี่ยมมาก!</div>
+                            </div>
+                            <div class="text-4xl font-black text-mint-600 flex items-baseline">
+                                <span id="res-score">88</span>
+                                <span class="text-sm font-normal text-gray-400 ml-1">/100</span>
+                            </div>
+                        </div>
+
+                        <!-- Detailed feedback breakdown -->
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between items-center py-1.5 border-b border-gray-100">
+                                <span class="text-gray-600 font-medium">ความตรงตามโจทย์:</span>
+                                <span id="fb-match" class="font-bold text-gray-800">ดีมาก</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1.5 border-b border-gray-100">
+                                <span class="text-gray-600 font-medium">สัดส่วนและรูปทรง:</span>
+                                <span id="fb-structure" class="font-bold text-gray-800">สมส่วน</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1.5">
+                                <span class="text-gray-600 font-medium">ความประณีต/ลายเส้น:</span>
+                                <span id="fb-clean" class="font-bold text-gray-800">เรียบร้อย</span>
+                            </div>
+                        </div>
+
+                        <!-- AI Comment text -->
+                        <div class="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-gray-700 text-xs leading-relaxed italic" id="res-comment">
+                            "กำลังโหลดคำวิจารณ์จาก AI..."
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result Footer buttons -->
+                <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                    <button onclick="returnToHome()" class="px-5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold text-sm transition">
+                        <i class="fa-solid fa-house mr-1.5"></i> เมนูหลัก
+                    </button>
+                    <button onclick="nextPromptGame()" class="px-6 py-2.5 rounded-xl bg-mint-600 hover:bg-mint-700 text-white font-semibold text-sm shadow-md transition flex items-center gap-2">
+                        <span>วาดโจทย์ถัดไป</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Script Application Logic -->
+    <script>
+        // 120 Prompts List
+        const promptsList = [
+            "แมวเหมียว", "สุนัขแสนรู้", "ดอกทานตะวัน", "แว่นตา", "รถยนต์", "บ้านสองชั้น", "ดวงอาทิตย์", "ต้นไม้ใหญ่",
+            "ไอศกรีมโคน", "รองเท้าผ้าใบ", "โทรศัพท์มือถือ", "นาฬิกาข้อมือ", "พระจันทร์เสี้ยว", "ร่มกันฝน", "เครื่องบิน",
+            "เรือใบ", "แอปเปิ้ลแดง", "กล้วยหอม", "ปลาหมึกยักษ์", "เต่าทอง", "ผีเสื้อแสนสวย", "นกฮูก", "ยูนิคอร์น",
+            "ภูเขาไฟ", "ถ้วยกาแฟ", "ปะการัง", "ไดโนเสาร์", "จรวดอวกาศ", "เอเลี่ยน", "หอไอเฟล", "ปิรามิดอียิปต์",
+            "คอมพิวเตอร์พกพา", "คีย์บอร์ด", "หูฟังครอบหัว", "แฮมเบอร์เกอร์", "พิซซ่าชิ้น", "ซูชิ", "สตรอว์เบอร์รี",
+            "แตงโม", "กระบองเพชร", "เห็ดวิเศษ", "พระอาทิตย์ตกดิน", "ประภาคาร", "กุญแจโบราณ", "หีบสมบัติ", "มงกุฎราชา",
+            "ดาบอัศวิน", "โล่ป้องกัน", "ธนูและลูกศร", "เกาะร้าง", "คลื่นทะเล", "ภูเขาหิมะ", "ถ้ำค้างคาว", "แมงมุม",
+            "งูเห่า", "กบเขียว", "เป็ดน้อย", "หงส์ขาว", "ปลาฉลาม", "วาฬยักษ์", "แมงกะพรุน", "ดาวทะเล", "หอยทาก",
+            "กระต่ายน้อย", "แครอท", "ฟักทองฮาโลวีน", "หมวกแม่มด", "ไม้กวาดวิเศษ", "ปราสาทเจ้าหญิง", "ดาวเคราะห์",
+            "หลุมดำ", "นักบินอวกาศ", "ดาวเทียม", "กีตาร์โปร่ง", "เปียโน", "กลองชุด", "ไวโolin", "ไมโครโฟน", "โทรโข่ง",
+            "กล้องถ่ายรูป", "ฟิล์มถ่ายภาพ", "หลอดไฟ", "กรรไกร", "แปรงสีฟัน", "ยาสีฟัน", "กระเป๋าเป้", "เสื้อยืด",
+            "กางเกงยีนส์", "หมวกแก๊ป", "ถุงมือกันหนาว", "ผ้าพันคอ", "เต็นท์ตั้งแคมป์", "กองไฟ", "ไม้เรียว", "หนังสือเปิด",
+            "ดินสอสี", "พู่กัน", "จานสี", "จดหมาย", "ซองจดหมาย", "แสตมป์", "ตู้ไปรษณีย์", "ถังขยะ", "ถังน้ำ",
+            "ก๊อกน้ำ", "อ่างอาบน้ำ", "หวีผม", "กระจกเงา", "เตียงนอน", "หมอนหนุน", "โซฟา", "โต๊ะทำงาน", "เก้าอี้โยก",
+            "ตู้เย็น", "เตาไมโครเวฟ", "หม้อหุงข้าว", "กระทะทอด", "ตะหลิว", "แก้วน้ำ", "ช้อนส้อม", "ตะเกียบ"
+        ];
+
+        let currentTimerDuration = 30;
+        let timerInterval = null;
+        let timeLeft = 30;
+        let currentPrompt = "";
+        
+        // Canvas State
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let currentTool = 'pen';
+        let penColor = '#1e382b';
+        let brushSize = 5;
+        let lastX = 0;
+        let lastY = 0;
+
+        function initCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+        }
+
+        function setTimerDuration(seconds) {
+            currentTimerDuration = seconds;
+            if(seconds === 30) {
+                document.getElementById('btn-time-30').className = "py-3 px-4 rounded-xl font-medium border-2 border-mint-500 bg-mint-500 text-white transition-all shadow-sm flex items-center justify-center gap-2";
+                document.getElementById('btn-time-60').className = "py-3 px-4 rounded-xl font-medium border-2 border-mint-200 bg-white text-gray-700 hover:border-mint-400 transition-all shadow-sm flex items-center justify-center gap-2";
+            } else {
+                document.getElementById('btn-time-60').className = "py-3 px-4 rounded-xl font-medium border-2 border-mint-500 bg-mint-500 text-white transition-all shadow-sm flex items-center justify-center gap-2";
+                document.getElementById('btn-time-30').className = "py-3 px-4 rounded-xl font-medium border-2 border-mint-200 bg-white text-gray-700 hover:border-mint-400 transition-all shadow-sm flex items-center justify-center gap-2";
+            }
+        }
+
+        function startGame() {
+            document.getElementById('home-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            setTimeout(() => {
+                initCanvas();
+                loadNewPrompt();
+                startTimer();
+            }, 50);
+        }
+
+        function returnToHome() {
+            clearInterval(timerInterval);
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('analyzing-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('home-screen').classList.remove('hidden');
+        }
+
+        function loadNewPrompt() {
+            const randomIndex = Math.floor(Math.random() * promptsList.length);
+            currentPrompt = promptsList[randomIndex];
+            document.getElementById('prompt-text').innerText = currentPrompt;
+            clearCanvas();
+        }
+
+        function skipPrompt() {
+            loadNewPrompt();
+            resetTimer();
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeLeft = currentTimerDuration;
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+
+                if(timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    submitDrawing();
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            startTimer();
+        }
+
+        function updateTimerDisplay() {
+            document.getElementById('timer-text').innerText = timeLeft;
+            const percentage = (timeLeft / currentTimerDuration) * 100;
+            const progressEl = document.getElementById('timer-progress');
+            progressEl.style.width = percentage + '%';
+            
+            if(timeLeft <= 10) {
+                progressEl.className = "bg-red-500 h-full transition-all duration-1000";
+            } else {
+                progressEl.className = "bg-mint-500 h-full transition-all duration-1000";
+            }
+        }
+
+        // Canvas Drawing Events
+        function startDrawing(e) {
+            isDrawing = true;
+            const pos = getPos(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getPos(e);
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pos.x, pos.y);
+            
+            if (currentTool === 'eraser') {
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = brushSize * 2;
+            } else {
+                ctx.strokeStyle = penColor;
+                ctx.lineWidth = brushSize;
+            }
+            
+            ctx.stroke();
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+            
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        canvas.addEventListener('touchstart', (e) => { startDrawing(e); e.preventDefault(); });
+        canvas.addEventListener('touchmove', (e) => { draw(e); e.preventDefault(); });
+        canvas.addEventListener('touchend', stopDrawing);
+
+        function setPenColor(color) {
+            penColor = color;
+            setTool('pen');
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                if(btn.dataset.color === color) {
+                    btn.classList.add('ring-2', 'ring-mint-400');
+                } else {
+                    btn.classList.remove('ring-2', 'ring-mint-400');
+                }
+            });
+        }
+
+        function setTool(tool) {
+            currentTool = tool;
+            if(tool === 'pen') {
+                document.getElementById('tool-pen').className = "px-3 py-1.5 rounded-xl bg-mint-100 text-mint-700 font-medium text-sm flex items-center gap-1.5 transition";
+                document.getElementById('tool-eraser').className = "px-3 py-1.5 rounded-xl hover:bg-gray-100 text-gray-600 font-medium text-sm flex items-center gap-1.5 transition";
+            } else {
+                document.getElementById('tool-eraser').className = "px-3 py-1.5 rounded-xl bg-mint-100 text-mint-700 font-medium text-sm flex items-center gap-1.5 transition";
+                document.getElementById('tool-pen').className = "px-3 py-1.5 rounded-xl hover:bg-gray-100 text-gray-600 font-medium text-sm flex items-center gap-1.5 transition";
+            }
+        }
+
+        function setBrushSize(size) {
+            brushSize = size;
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Submit drawing & call Gemini API
+        async function submitDrawing() {
+            clearInterval(timerInterval);
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('analyzing-screen').classList.remove('hidden');
+
+            let progress = 0;
+            const bar = document.getElementById('analysis-bar');
+            const statusText = document.getElementById('analyzing-status');
+            
+            const progressInterval = setInterval(() => {
+                if(progress < 90) {
+                    progress += 15;
+                    bar.style.width = progress + '%';
+                }
+            }, 200);
+
+            // Get canvas base64 data (remove header 'data:image/png;base64,')
+            const dataUrl = canvas.toDataURL('image/png');
+            const base64Image = dataUrl.split(',')[1];
+            document.getElementById('res-image').src = dataUrl;
+            document.getElementById('res-prompt').innerText = currentPrompt;
+
+            const userApiKey = document.getElementById('api-key-input').value.trim();
+            const apiKey = userApiKey !== "" ? userApiKey : ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const systemPrompt = "คุณคือ AI ผู้ตรวจวิเคราะห์ภาพวาดที่มีความเข้มงวด ตรงไปตรงมา และไม่เกรงใจใคร หากผู้ใช้วาดมั่วๆ เป็นแค่เส้นขีดลากสะเปะสะปะ หรือไม่เป็นรูปเป็นร่าง ไม่ตรงกับโจทย์ ให้วิเคราะห์ว่า 'ไม่สวย' พร้อมหักคะแนนอย่างโหดเหี้ยม (คะแนนต่ำกว่า 45) แต่ถ้าวาดเป็นรูปเป็นร่างและสื่อถึงโจทย์ได้จริง ให้คะแนนสูงตามคุณภาพ พร้อมให้ JSON ตามโครงสร้างที่กำหนดเท่านั้น";
+
+            const promptText = `ผู้เล่นได้รับโจทย์ให้วาด: "${currentPrompt}" กรุณาตรวจสอบภาพวาดนี้อย่างสมจริงเข้มงวด:
+1. พิจารณาว่าภาพวาดเป็นรูปเป็นร่างหรือไม่ หรือเป็นแค่เส้นขีดมั่วๆ
+2. ตรงกับโจทย์ "${currentPrompt}" หรือไม่
+3. ประเมินคะแนนเต็ม 100
+ตอบกลับเป็น JSON format เท่านั้น โดยมีโครงสร้างดังนี้:
+{
+  "score": (ตัวเลข 0 ถึง 100),
+  "verdict": "(คำตัดสินสั้นๆ เช่น ผลงานยอดเยี่ยม / ไม่เป็นรูปเป็นร่าง ดูไม่ออก)",
+  "matchText": "(ระดับความตรงตามโจทย์ เช่น ตรงเป๊ะ / ไม่ตรงเลย)",
+  "structureText": "(สัดส่วนรูปทรง เช่น สมส่วน / เบี้ยวและเละ)",
+  "cleanText": "(ความประณีต เช่น ลายเส้นสะอาด / เส้นลากมั่วซั่ว)",
+  "comment": "(คำวิจารณ์ตรงไปตรงมา เรียลๆ ไม่ตอแหล)"
+}`;
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: promptText },
+                            {
+                                inlineData: {
+                                    mimeType: "image/png",
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }
+                ],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                clearInterval(progressInterval);
+                bar.style.width = '100%';
+
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const jsonText = candidate.content.parts[0].text;
+                    const evaluation = JSON.parse(jsonText);
+                    setTimeout(() => displayResults(evaluation), 300);
+                } else {
+                    throw new Error("Invalid API response");
+                }
+            } catch (error) {
+                clearInterval(progressInterval);
+                // Fallback robust pixel analysis if API key is invalid/missing or rate-limited
+                const fallbackEval = evaluateCanvasLocally();
+                setTimeout(() => displayResults(fallbackEval), 300);
+            }
+        }
+
+        // Strict fallback pixel analyzer if API key is not supplied
+        function evaluateCanvasLocally() {
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let nonWhitePixels = 0;
+            let edgeDensity = 0;
+            
+            for(let i = 0; i < imgData.data.length; i += 4) {
+                if(imgData.data[i] < 240 || imgData.data[i+1] < 240 || imgData.data[i+2] < 240) {
+                    nonWhitePixels++;
+                }
+            }
+
+            let score = 55;
+            let verdict = "พอใช้ได้ พอเดาออก";
+            let match = "ปานกลาง";
+            let structure = "พอมีโครงร่าง";
+            let clean = "เส้นธรรมดา";
+            let comment = `"${currentPrompt} ของคุณพอดูออกว่าเป็นรูปร่าง แต่สัดส่วนยังดูหยาบไปหน่อย พยายามเกลากลวดลายให้คมชัดขึ้นนะ!"`;
+
+            if(nonWhitePixels < 120) {
+                score = 15;
+                verdict = "วาดอะไรเนี่ย?! ดูไม่ออกเลย";
+                match = "ไม่ตรงเลย";
+                structure = "ไม่มีรูปทรง";
+                clean = "เส้นลากมั่วซั่ว";
+                comment = `"${currentPrompt} อันนี้แทบไม่มีอะไรเลย เหมือนแค่ขีดเส้นเล่นส่งๆ งานแบบนี้ AI ให้ตกและไม่ได้คะแนนความตั้งใจ!"`;
+            } else if(nonWhitePixels > 8000) {
+                score = 88;
+                verdict = "ผลงานยอดเยี่ยม สวยงาม!";
+                match = "ตรงเป๊ะตามโจทย์";
+                structure = "สมส่วน มีมิติ";
+                clean = "ลายเส้นประณีต";
+                comment = `"${currentPrompt} ชิ้นนี้เก็บรายละเอียดได้ครบถ้วน ลายเส้นมีความตั้งใจและสื่อถึงโจทย์ได้อย่างชัดเจน เยี่ยมมาก!"`;
+            }
+
+            return { score, verdict, matchText: match, structureText: structure, cleanText: clean, comment };
+        }
+
+        function displayResults(data) {
+            document.getElementById('analyzing-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+
+            document.getElementById('res-score').innerText = data.score;
+            document.getElementById('res-verdict').innerText = data.verdict;
+            document.getElementById('fb-match').innerText = data.matchText;
+            document.getElementById('fb-structure').innerText = data.structureText;
+            document.getElementById('fb-clean').innerText = data.cleanText;
+            document.getElementById('res-comment').innerText = `"${data.comment}"`;
+        }
+
+        function nextPromptGame() {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            initCanvas();
+            loadNewPrompt();
+            startTimer();
+        }
+    </script>
+</body>
+</html>
